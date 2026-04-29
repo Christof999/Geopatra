@@ -57,12 +57,22 @@ export interface ShapeStyle {
   opacity: number
 }
 
-export interface CanvasState {
-  objects: GeoObject[]
-  selectedTool: ToolType
-  snapThreshold: number
-  history: GeoObject[][]
-  pendingLine: { x1: number; y1: number } | null
-  pendingCircleCenter: { x: number; y: number } | null
-  ghostPoint: Point | null
+// ── Saved design (Firestore document) ─────────────────────────────────────
+
+export interface DesignDoc {
+  id: string
+  title: string
+  createdAt: Date
+  symmetrySteps: number
+  objectsData: GeoObject[]
+  thumbnailUrl: string
+}
+
+/** Shape of the raw Firestore document (before deserialisation) */
+export interface DesignDocFirestore {
+  title: string
+  createdAt: unknown // Firestore Timestamp
+  symmetrySteps: number
+  objectsData: string // JSON-serialised GeoObject[]
+  thumbnailUrl: string
 }

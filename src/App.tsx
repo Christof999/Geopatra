@@ -5,6 +5,10 @@ import SymmetryCanvas from './components/SymmetryCanvas'
 import SymmetryControls from './components/SymmetryControls'
 import Toolbar from './components/Toolbar'
 import StatusBar from './components/StatusBar'
+import TopBar from './components/TopBar'
+import Gallery from './components/Gallery'
+import ExportModal from './components/ExportModal'
+import SaveModal from './components/SaveModal'
 import { useStore } from './store'
 
 export default function App() {
@@ -60,7 +64,9 @@ export default function App() {
       <Toolbar />
       <SymmetryControls />
       <StatusBar />
+      <TopBar />
 
+      {/* Pending operation banner */}
       <AnimatePresence>
         {hasPending && (
           <motion.div
@@ -77,17 +83,10 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.5 }}
-        className="absolute top-4 right-4 z-10 text-right pointer-events-none"
-      >
-        <div className="text-xs text-gray-700 font-medium tracking-widest uppercase">
-          Geopatra
-        </div>
-        <div className="text-[10px] text-gray-800 mt-0.5">P · L · C · D</div>
-      </motion.div>
+      {/* Layer 3: Modals (portal-level z-index) */}
+      <Gallery />
+      <ExportModal />
+      <SaveModal />
     </div>
   )
 }

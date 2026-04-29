@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { GeoObject, GeoPath, ToolType, Point } from './types'
+import type { DesignDoc, GeoObject, GeoPath, ToolType, Point } from './types'
 import { generateId } from './utils/geometry'
 
 const DEFAULT_STYLE = {
@@ -32,8 +32,17 @@ interface StoreState {
   setSymmetrySteps: (n: number) => void
   setSymmetryCenter: (p: Point | null) => void
 
+  galleryOpen: boolean
+  exportModalOpen: boolean
+  saveModalOpen: boolean
+
+  setGalleryOpen: (open: boolean) => void
+  setExportModalOpen: (open: boolean) => void
+  setSaveModalOpen: (open: boolean) => void
+
   handleCanvasClick: (point: Point) => void
   addPath: (path: GeoPath) => void
+  loadDesign: (design: DesignDoc) => void
 
   undo: () => void
   clear: () => void
@@ -63,6 +72,24 @@ export const useStore = create<StoreState>((set, get) => ({
   setSymmetrySteps: (n) => set({ symmetrySteps: Math.max(1, Math.min(24, n)) }),
 
   setSymmetryCenter: (p) => set({ symmetryCenter: p }),
+
+  galleryOpen: false,
+  exportModalOpen: false,
+  saveModalOpen: false,
+
+  setGalleryOpen: (open) => set({ galleryOpen: open }),
+  setExportModalOpen: (open) => set({ exportModalOpen: open }),
+  setSaveModalOpen: (open) => set({ saveModalOpen: open }),
+
+  loadDesign: (design) => {
+    const { objects, history } = get()
+    set({
+      history: [...history, objects],
+      objects: design.objectsData,
+      symmetrySteps: design.symmetrySteps,
+      galleryOpen: false,
+    })
+  },
 
   handleCanvasClick: (point) => {
     const { selectedTool, objects, history, pendingLine, pendingCircleCenter } = get()
