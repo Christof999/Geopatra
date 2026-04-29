@@ -10,7 +10,7 @@ export default function TopBar() {
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.4, delay: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
-      className="absolute top-4 right-4 z-10 flex items-center gap-1.5"
+      className="absolute safe-top safe-right z-10 flex items-center gap-1.5"
     >
       <div className="bg-surface border border-border rounded-xl p-1 flex gap-0.5 shadow-xl">
         <TopBarButton
@@ -60,7 +60,7 @@ function TopBarButton({
       whileHover={disabled ? {} : { scale: 1.08 }}
       whileTap={disabled ? {} : { scale: 0.92 }}
       title={label}
-      className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+      className={`w-11 h-11 rounded-lg flex items-center justify-center transition-colors ${
         disabled
           ? 'text-gray-800 cursor-not-allowed'
           : 'text-gray-400 hover:text-gray-200 hover:bg-subtle'

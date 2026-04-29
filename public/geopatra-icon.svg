@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#0f0f11"/>
+  <!-- Outer circle -->
+  <circle cx="256" cy="256" r="188" fill="none" stroke="#6366f1" stroke-width="7" opacity="0.35"/>
+  <!-- 6-fold symmetry lines -->
+  <g stroke="#6366f1" stroke-width="5" opacity="0.5">
+    <line x1="256" y1="68" x2="256" y2="444"/>
+    <line x1="89"  y1="160" x2="423" y2="352"/>
+    <line x1="89"  y1="352" x2="423" y2="160"/>
+  </g>
+  <!-- Inner hexagon -->
+  <polygon
+    points="256,120 355,178 355,334 256,392 157,334 157,178"
+    fill="none" stroke="#6366f1" stroke-width="6" stroke-linejoin="round" opacity="0.7"/>
+  <!-- Inner star lines -->
+  <g stroke="#6366f1" stroke-width="4" opacity="0.4">
+    <line x1="256" y1="120" x2="355" y2="334"/>
+    <line x1="355" y1="178" x2="157" y2="334"/>
+    <line x1="355" y1="334" x2="157" y2="178"/>
+    <line x1="256" y1="392" x2="157" y2="178"/>
+    <line x1="157" y1="334" x2="355" y2="178"/>
+    <line x1="157" y1="178" x2="355" y2="334"/>
+  </g>
+  <!-- Centre dot -->
+  <circle cx="256" cy="256" r="10" fill="#6366f1"/>
+</svg>

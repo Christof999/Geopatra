@@ -27,7 +27,7 @@ export default function StatusBar() {
       initial={{ y: 20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.4, delay: 0.15, ease: [0.25, 0.46, 0.45, 0.94] }}
-      className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-4"
+      className="absolute safe-bottom left-1/2 -translate-x-1/2 z-10 flex items-center gap-4"
     >
       <div className="bg-surface border border-border rounded-lg px-4 py-2 flex items-center gap-6 shadow-2xl">
         {/* Object count */}

@@ -14,12 +14,30 @@ body {
   font-family: 'Inter', system-ui, sans-serif;
   overflow: hidden;
   user-select: none;
+  /* Prevent iOS elastic/bounce scroll */
+  overscroll-behavior: none;
+  /* Prevent callout on long-press (links, images) */
+  -webkit-touch-callout: none;
+}
+
+/* Remove tap highlight flash on iOS */
+* {
+  -webkit-tap-highlight-color: transparent;
 }
 
 #root {
   width: 100%;
-  height: 100vh;
+  /* Use dvh so the canvas fills the full screen on iOS Safari without address bar offset */
+  height: 100dvh;
 }
+
+/* ── Safe-area utility classes ───────────────────────────────────────────── */
+/* Used on toolbars/status bars to keep them clear of the home indicator
+   and notch on iPad / iPhone in standalone mode.                          */
+.safe-top    { top:    max(1rem, calc(env(safe-area-inset-top,    0px) + 0.5rem)); }
+.safe-bottom { bottom: max(1rem, calc(env(safe-area-inset-bottom, 0px) + 0.5rem)); }
+.safe-left   { left:   max(1rem, calc(env(safe-area-inset-left,   0px) + 0.5rem)); }
+.safe-right  { right:  max(1rem, calc(env(safe-area-inset-right,  0px) + 0.5rem)); }
 
 svg {
   display: block;

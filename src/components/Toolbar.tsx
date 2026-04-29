@@ -25,7 +25,7 @@ export default function Toolbar() {
       initial={{ x: -60, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
-      className="absolute left-4 top-1/2 -translate-y-1/2 z-10 flex flex-col gap-1"
+      className="absolute safe-left top-1/2 -translate-y-1/2 z-10 flex flex-col gap-1"
     >
       {/* Tool group */}
       <div className="bg-surface border border-border rounded-xl p-1.5 flex flex-col gap-1 shadow-2xl">
@@ -76,7 +76,7 @@ function ToolButton({
       whileTap={{ scale: 0.95 }}
       title={`${tool.label} (${tool.shortcut})`}
       className={`
-        relative w-10 h-10 rounded-lg flex items-center justify-center
+        relative w-11 h-11 rounded-lg flex items-center justify-center
         transition-colors duration-150
         ${active
           ? 'bg-accent text-white shadow-lg shadow-accent/30'
@@ -119,7 +119,7 @@ function ActionButton({
       whileTap={disabled ? {} : { scale: 0.95 }}
       title={`${label}${shortcut ? ` (${shortcut})` : ''}`}
       className={`
-        w-10 h-10 rounded-lg flex items-center justify-center
+        w-11 h-11 rounded-lg flex items-center justify-center
         transition-colors duration-150
         ${disabled
           ? 'text-gray-700 cursor-not-allowed'

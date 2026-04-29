@@ -9,10 +9,14 @@ import TopBar from './components/TopBar'
 import Gallery from './components/Gallery'
 import ExportModal from './components/ExportModal'
 import SaveModal from './components/SaveModal'
+import { useWakeLock } from './hooks/useWakeLock'
 import { useStore } from './store'
 
 export default function App() {
   const { setTool, undo, pendingLine, pendingCircleCenter, selectedTool } = useStore()
+
+  // Keep screen awake on iPad while the app is open
+  useWakeLock()
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

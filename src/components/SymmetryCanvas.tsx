@@ -1,7 +1,7 @@
 import { useRef, useEffect, useCallback } from 'react'
 import { useStore } from '../store'
 import { rotatePoint, generateId } from '../utils/geometry'
-import type { GeoObject, GeoPath, StrokePoint } from '../types'
+import type { GeoObject, StrokePoint } from '../types'
 
 // ── Pure canvas drawing helpers (no React) ────────────────────────────────
 
@@ -100,6 +100,9 @@ export default function SymmetryCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const liveRef = useRef<StrokePoint[]>([])
   const isDrawingRef = useRef(false)
+  // Palm rejection: track which pointer id + type is currently drawing
+  const activePointerIdRef = useRef<number | null>(null)
+  const activePointerTypeRef = useRef<string | null>(null)
 
   // Single ref that the persistent rAF loop reads — avoids restarting the loop
   const rs = useRef<RenderState>({
@@ -202,32 +205,52 @@ export default function SymmetryCanvas() {
 
   const onPointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     if (rs.current.selectedTool !== 'draw') return
+
+    // ── Palm rejection ────────────────────────────────────────────────────
+    // If a pen stroke is already active, ignore any touch (hand resting on screen)
+    if (activePointerIdRef.current !== null) {
+      if (e.pointerType === 'pen' && activePointerTypeRef.current === 'touch') {
+        // Pen overrides finger — discard the touch stroke and start fresh
+        liveRef.current = []
+        isDrawingRef.current = false
+      } else {
+        return // Only one active stroke at a time
+      }
+    }
+
     e.currentTarget.setPointerCapture(e.pointerId)
+    activePointerIdRef.current = e.pointerId
+    activePointerTypeRef.current = e.pointerType
     isDrawingRef.current = true
     liveRef.current = [{ x: e.clientX, y: e.clientY, pressure: e.pressure || 0.5 }]
   }, [])
 
   const onPointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDrawingRef.current) return
-    // getCoalescedEvents gives Apple Pencil all intermediate points between frames
+    if (e.pointerId !== activePointerIdRef.current) return // reject stray pointers
+
+    // getCoalescedEvents gives Apple Pencil all sub-frame points
     const evts = (e.nativeEvent as PointerEvent).getCoalescedEvents?.() ?? [e.nativeEvent]
     for (const ev of evts) {
       liveRef.current.push({ x: ev.clientX, y: ev.clientY, pressure: ev.pressure || 0.5 })
     }
   }, [])
 
-  const onPointerUp = useCallback(
-    (_e: React.PointerEvent<HTMLCanvasElement>) => {
+  const finishStroke = useCallback(
+    (e: React.PointerEvent<HTMLCanvasElement>) => {
+      if (e.pointerId !== activePointerIdRef.current) return
+      activePointerIdRef.current = null
+      activePointerTypeRef.current = null
+
       if (!isDrawingRef.current) return
       isDrawingRef.current = false
 
       const pts = liveRef.current.slice()
       liveRef.current = []
-
       if (pts.length < 2) return
 
       const { cx, cy, symmetrySteps } = rs.current
-      const path: GeoPath = {
+      addPath({
         id: generateId(),
         type: 'path',
         points: pts,
@@ -235,8 +258,7 @@ export default function SymmetryCanvas() {
         centerX: cx,
         centerY: cy,
         style: { stroke: '#6366f1', strokeWidth: 1.5, fill: 'none', opacity: 1 },
-      }
-      addPath(path)
+      })
     },
     [addPath],
   )
@@ -252,8 +274,8 @@ export default function SymmetryCanvas() {
       }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
+      onPointerUp={finishStroke}
+      onPointerCancel={finishStroke}
     />
   )
 }
