@@ -1,4 +1,4 @@
-export type ToolType = 'point' | 'line' | 'circle'
+export type ToolType = 'point' | 'line' | 'circle' | 'draw'
 
 export interface Point {
   x: number
@@ -32,7 +32,23 @@ export interface GeoCircle {
   style: ShapeStyle
 }
 
-export type GeoObject = GeoPoint | GeoLine | GeoCircle
+export interface StrokePoint {
+  x: number
+  y: number
+  pressure: number
+}
+
+export interface GeoPath {
+  id: string
+  type: 'path'
+  points: StrokePoint[]
+  steps: number
+  centerX: number
+  centerY: number
+  style: ShapeStyle
+}
+
+export type GeoObject = GeoPoint | GeoLine | GeoCircle | GeoPath
 
 export interface ShapeStyle {
   stroke: string

@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { GeoObject, ToolType, Point } from './types'
+import type { GeoObject, GeoPath, ToolType, Point } from './types'
 import { generateId } from './utils/geometry'
 
 const DEFAULT_STYLE = {
@@ -24,11 +24,16 @@ interface StoreState {
   pendingLine: { x1: number; y1: number } | null
   pendingCircleCenter: { x: number; y: number } | null
   ghostPoint: Point | null
+  symmetrySteps: number
+  symmetryCenter: Point | null
 
   setTool: (tool: ToolType) => void
   setGhostPoint: (p: Point | null) => void
+  setSymmetrySteps: (n: number) => void
+  setSymmetryCenter: (p: Point | null) => void
 
   handleCanvasClick: (point: Point) => void
+  addPath: (path: GeoPath) => void
 
   undo: () => void
   clear: () => void
@@ -42,11 +47,22 @@ export const useStore = create<StoreState>((set, get) => ({
   pendingLine: null,
   pendingCircleCenter: null,
   ghostPoint: null,
+  symmetrySteps: 6,
+  symmetryCenter: null,
 
   setTool: (tool) =>
-    set({ selectedTool: tool, pendingLine: null, pendingCircleCenter: null }),
+    set({
+      selectedTool: tool,
+      pendingLine: null,
+      pendingCircleCenter: null,
+      ghostPoint: tool === 'draw' ? null : get().ghostPoint,
+    }),
 
   setGhostPoint: (p) => set({ ghostPoint: p }),
+
+  setSymmetrySteps: (n) => set({ symmetrySteps: Math.max(1, Math.min(24, n)) }),
+
+  setSymmetryCenter: (p) => set({ symmetryCenter: p }),
 
   handleCanvasClick: (point) => {
     const { selectedTool, objects, history, pendingLine, pendingCircleCenter } = get()
@@ -117,6 +133,11 @@ export const useStore = create<StoreState>((set, get) => ({
         break
       }
     }
+  },
+
+  addPath: (path) => {
+    const { objects, history } = get()
+    set({ history: [...history, objects], objects: [...objects, path] })
   },
 
   undo: () => {

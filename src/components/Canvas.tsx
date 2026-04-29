@@ -128,21 +128,10 @@ export default function Canvas() {
   return (
     <svg
       ref={svgRef}
-      className={`w-full h-full ${getCursorClass(selectedTool)}`}
+      className={`absolute inset-0 w-full h-full ${getCursorClass(selectedTool)}`}
       onClick={handleClick}
       onMouseLeave={handleMouseLeave}
     >
-      {/* Grid dots */}
-      <defs>
-        <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-          <circle cx="0" cy="0" r="0.8" fill="#2a2a33" />
-          <circle cx="40" cy="0" r="0.8" fill="#2a2a33" />
-          <circle cx="0" cy="40" r="0.8" fill="#2a2a33" />
-          <circle cx="40" cy="40" r="0.8" fill="#2a2a33" />
-        </pattern>
-      </defs>
-      <rect width="100%" height="100%" fill="url(#grid)" />
-
       {/* Committed objects */}
       {objects.map((obj) => {
         if (obj.type === 'point') {

@@ -1,12 +1,14 @@
 import { useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import Canvas from './components/Canvas'
+import SymmetryCanvas from './components/SymmetryCanvas'
+import SymmetryControls from './components/SymmetryControls'
 import Toolbar from './components/Toolbar'
 import StatusBar from './components/StatusBar'
 import { useStore } from './store'
 
 export default function App() {
-  const { setTool, undo, pendingLine, pendingCircleCenter } = useStore()
+  const { setTool, undo, pendingLine, pendingCircleCenter, selectedTool } = useStore()
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -21,6 +23,9 @@ export default function App() {
           break
         case 'c':
           setTool('circle')
+          break
+        case 'd':
+          setTool('draw')
           break
         case 'z':
           if (e.metaKey || e.ctrlKey) {
@@ -39,11 +44,21 @@ export default function App() {
   }, [setTool, undo])
 
   const hasPending = pendingLine !== null || pendingCircleCenter !== null
+  const isDrawMode = selectedTool === 'draw'
 
   return (
     <div className="relative w-full h-screen bg-canvas overflow-hidden">
-      <Canvas />
+      {/* Layer 0: HTML canvas — grid + freehand symmetry strokes */}
+      <SymmetryCanvas />
+
+      {/* Layer 1: SVG — geometric objects; transparent to pointer when drawing */}
+      <div className={`absolute inset-0 ${isDrawMode ? 'pointer-events-none' : ''}`}>
+        <Canvas />
+      </div>
+
+      {/* Layer 2: UI overlays */}
       <Toolbar />
+      <SymmetryControls />
       <StatusBar />
 
       <AnimatePresence>
@@ -71,7 +86,7 @@ export default function App() {
         <div className="text-xs text-gray-700 font-medium tracking-widest uppercase">
           Geopatra
         </div>
-        <div className="text-[10px] text-gray-800 mt-0.5">P · L · C</div>
+        <div className="text-[10px] text-gray-800 mt-0.5">P · L · C · D</div>
       </motion.div>
     </div>
   )

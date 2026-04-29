@@ -59,6 +59,26 @@ export function circleRadius(center: Point, edge: Point): number {
   return euclidean(center, edge)
 }
 
+/**
+ * Rotates point (x, y) around center (cx, cy) by angle alpha (radians).
+ * newX = cx + (x-cx)*cos(α) - (y-cy)*sin(α)
+ * newY = cy + (x-cx)*sin(α) + (y-cy)*cos(α)
+ */
+export function rotatePoint(
+  x: number,
+  y: number,
+  cx: number,
+  cy: number,
+  alpha: number,
+): Point {
+  const dx = x - cx
+  const dy = y - cy
+  return {
+    x: cx + dx * Math.cos(alpha) - dy * Math.sin(alpha),
+    y: cy + dx * Math.sin(alpha) + dy * Math.cos(alpha),
+  }
+}
+
 export function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 }

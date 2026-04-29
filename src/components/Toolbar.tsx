@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Dot, Minus, Circle, Trash2, Undo2 } from 'lucide-react'
+import { Dot, Minus, Circle, Trash2, Undo2, PenLine } from 'lucide-react'
 import { useStore } from '../store'
 import type { ToolType } from '../types'
 
@@ -14,6 +14,7 @@ const tools: Tool[] = [
   { id: 'point', label: 'Punkt', icon: <Dot size={20} />, shortcut: 'P' },
   { id: 'line', label: 'Linie', icon: <Minus size={20} />, shortcut: 'L' },
   { id: 'circle', label: 'Kreis', icon: <Circle size={20} />, shortcut: 'C' },
+  { id: 'draw', label: 'Zeichnen', icon: <PenLine size={18} />, shortcut: 'D' },
 ]
 
 export default function Toolbar() {
