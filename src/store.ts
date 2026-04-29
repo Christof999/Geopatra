@@ -1,0 +1,141 @@
+import { create } from 'zustand'
+import type { GeoObject, ToolType, Point } from './types'
+import { generateId } from './utils/geometry'
+
+const DEFAULT_STYLE = {
+  stroke: '#6366f1',
+  strokeWidth: 1.5,
+  fill: 'none',
+  opacity: 1,
+}
+
+const POINT_STYLE = {
+  stroke: '#6366f1',
+  strokeWidth: 1.5,
+  fill: '#6366f1',
+  opacity: 1,
+}
+
+interface StoreState {
+  objects: GeoObject[]
+  selectedTool: ToolType
+  snapThreshold: number
+  history: GeoObject[][]
+  pendingLine: { x1: number; y1: number } | null
+  pendingCircleCenter: { x: number; y: number } | null
+  ghostPoint: Point | null
+
+  setTool: (tool: ToolType) => void
+  setGhostPoint: (p: Point | null) => void
+
+  handleCanvasClick: (point: Point) => void
+
+  undo: () => void
+  clear: () => void
+}
+
+export const useStore = create<StoreState>((set, get) => ({
+  objects: [],
+  selectedTool: 'point',
+  snapThreshold: 12,
+  history: [],
+  pendingLine: null,
+  pendingCircleCenter: null,
+  ghostPoint: null,
+
+  setTool: (tool) =>
+    set({ selectedTool: tool, pendingLine: null, pendingCircleCenter: null }),
+
+  setGhostPoint: (p) => set({ ghostPoint: p }),
+
+  handleCanvasClick: (point) => {
+    const { selectedTool, objects, history, pendingLine, pendingCircleCenter } = get()
+
+    switch (selectedTool) {
+      case 'point': {
+        const newPoint: GeoObject = {
+          id: generateId(),
+          type: 'point',
+          x: point.x,
+          y: point.y,
+          style: POINT_STYLE,
+        }
+        set({
+          history: [...history, objects],
+          objects: [...objects, newPoint],
+        })
+        break
+      }
+
+      case 'line': {
+        if (!pendingLine) {
+          set({ pendingLine: { x1: point.x, y1: point.y } })
+        } else {
+          const newLine: GeoObject = {
+            id: generateId(),
+            type: 'line',
+            x1: pendingLine.x1,
+            y1: pendingLine.y1,
+            x2: point.x,
+            y2: point.y,
+            style: DEFAULT_STYLE,
+          }
+          set({
+            history: [...history, objects],
+            objects: [...objects, newLine],
+            pendingLine: null,
+          })
+        }
+        break
+      }
+
+      case 'circle': {
+        if (!pendingCircleCenter) {
+          set({ pendingCircleCenter: { x: point.x, y: point.y } })
+        } else {
+          const dx = point.x - pendingCircleCenter.x
+          const dy = point.y - pendingCircleCenter.y
+          const r = Math.sqrt(dx * dx + dy * dy)
+          if (r > 2) {
+            const newCircle: GeoObject = {
+              id: generateId(),
+              type: 'circle',
+              cx: pendingCircleCenter.x,
+              cy: pendingCircleCenter.y,
+              r,
+              style: DEFAULT_STYLE,
+            }
+            set({
+              history: [...history, objects],
+              objects: [...objects, newCircle],
+              pendingCircleCenter: null,
+            })
+          } else {
+            set({ pendingCircleCenter: null })
+          }
+        }
+        break
+      }
+    }
+  },
+
+  undo: () => {
+    const { history } = get()
+    if (history.length === 0) return
+    const prev = history[history.length - 1]
+    set({
+      objects: prev,
+      history: history.slice(0, -1),
+      pendingLine: null,
+      pendingCircleCenter: null,
+    })
+  },
+
+  clear: () =>
+    set((state) => ({
+      history: [...state.history, state.objects],
+      objects: [],
+      pendingLine: null,
+      pendingCircleCenter: null,
+    })),
+}))
