@@ -81,7 +81,7 @@ export default function Canvas() {
           y1={pendingLine.y1}
           x2={ghostPoint.x}
           y2={ghostPoint.y}
-          stroke="#6366f1"
+          stroke="#1a1a1a"
           strokeWidth={1.5}
           strokeDasharray="4 4"
           opacity={0.5}
@@ -100,7 +100,7 @@ export default function Canvas() {
             cx={pendingCircleCenter.x}
             cy={pendingCircleCenter.y}
             r={r}
-            stroke="#6366f1"
+            stroke="#1a1a1a"
             strokeWidth={1.5}
             fill="none"
             strokeDasharray="4 4"
@@ -112,7 +112,7 @@ export default function Canvas() {
             y1={pendingCircleCenter.y}
             x2={ghostPoint.x}
             y2={ghostPoint.y}
-            stroke="#6366f1"
+            stroke="#1a1a1a"
             strokeWidth={1}
             strokeDasharray="2 3"
             opacity={0.3}
@@ -189,7 +189,7 @@ export default function Canvas() {
           cx={pendingLine.x1}
           cy={pendingLine.y1}
           r={4}
-          fill="#6366f1"
+          fill="#1a1a1a"
           opacity={0.9}
           pointerEvents="none"
         />
@@ -199,7 +199,7 @@ export default function Canvas() {
           cx={pendingCircleCenter.x}
           cy={pendingCircleCenter.y}
           r={4}
-          fill="#6366f1"
+          fill="#1a1a1a"
           opacity={0.9}
           pointerEvents="none"
         />
@@ -212,7 +212,7 @@ export default function Canvas() {
           cy={ghostPoint.y}
           r={10}
           fill="none"
-          stroke="#6366f1"
+          stroke="#1a1a1a"
           strokeWidth={1.5}
           opacity={0.8}
           pointerEvents="none"
@@ -225,7 +225,7 @@ export default function Canvas() {
           cx={ghostPoint.x}
           cy={ghostPoint.y}
           r={isSnapped ? 4 : 3}
-          fill={isSnapped ? '#6366f1' : '#ffffff'}
+          fill={isSnapped ? '#1a1a1a' : '#9ca3af'}
           opacity={isSnapped ? 1 : 0.4}
           pointerEvents="none"
         />

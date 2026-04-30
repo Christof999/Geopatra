@@ -55,7 +55,7 @@ export default function App() {
   const isDrawMode = selectedTool === 'draw'
 
   return (
-    <div className="relative w-full h-screen bg-canvas overflow-hidden">
+    <div className="relative w-full h-screen bg-white overflow-hidden">
       {/* Layer 0: HTML canvas — grid + freehand symmetry strokes */}
       <SymmetryCanvas />
 

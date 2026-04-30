@@ -45,6 +45,7 @@ export interface GeoPath {
   steps: number
   centerX: number
   centerY: number
+  closed: boolean
   style: ShapeStyle
 }
 

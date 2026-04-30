@@ -6,7 +6,7 @@ import type { GeoObject, StrokePoint } from '../types'
 // ── Pure canvas drawing helpers (no React) ────────────────────────────────
 
 function drawGrid(ctx: CanvasRenderingContext2D, w: number, h: number) {
-  ctx.fillStyle = '#2a2a33'
+  ctx.fillStyle = '#d4d4d4'
   for (let x = 0; x <= w; x += 40) {
     for (let y = 0; y <= h; y += 40) {
       ctx.beginPath()
@@ -27,7 +27,7 @@ function drawGuides(
   const guideLen = Math.hypot(w, h)
 
   if (steps > 1) {
-    ctx.strokeStyle = 'rgba(99,102,241,0.08)'
+    ctx.strokeStyle = 'rgba(0,0,0,0.06)'
     ctx.lineWidth = 1
     ctx.setLineDash([])
     for (let i = 0; i < steps; i++) {
@@ -39,7 +39,7 @@ function drawGuides(
     }
   }
 
-  ctx.strokeStyle = 'rgba(99,102,241,0.3)'
+  ctx.strokeStyle = 'rgba(0,0,0,0.2)'
   ctx.lineWidth = 1
   ctx.setLineDash([3, 4])
   ctx.beginPath()
@@ -52,7 +52,7 @@ function drawGuides(
   ctx.stroke()
   ctx.setLineDash([])
 
-  ctx.fillStyle = 'rgba(99,102,241,0.55)'
+  ctx.fillStyle = 'rgba(0,0,0,0.35)'
   ctx.beginPath()
   ctx.arc(cx, cy, 2.5, 0, Math.PI * 2)
   ctx.fill()
@@ -64,23 +64,60 @@ function drawStroke(
   steps: number,
   cx: number,
   cy: number,
-  color: string,
+  stroke: string,
+  strokeWidth: number,
+  fill: string,
+  closed: boolean,
 ) {
   if (points.length < 2) return
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
-  ctx.strokeStyle = color
 
   for (let s = 0; s < steps; s++) {
     const alpha = (s / steps) * Math.PI * 2
+
+    // Fill pass — build the complete path outline, then fill
+    if (fill !== 'none') {
+      ctx.beginPath()
+      const fp = rotatePoint(points[0].x, points[0].y, cx, cy, alpha)
+      ctx.moveTo(fp.x, fp.y)
+      for (let i = 1; i < points.length; i++) {
+        const p = rotatePoint(points[i].x, points[i].y, cx, cy, alpha)
+        ctx.lineTo(p.x, p.y)
+      }
+      if (closed) ctx.closePath()
+      ctx.fillStyle = fill
+      ctx.fill()
+    }
+
+    // Stroke pass — pressure-sensitive segments
+    ctx.strokeStyle = stroke
     for (let i = 1; i < points.length; i++) {
       const p0 = rotatePoint(points[i - 1].x, points[i - 1].y, cx, cy, alpha)
       const p1 = rotatePoint(points[i].x, points[i].y, cx, cy, alpha)
       const pressure = (points[i - 1].pressure + points[i].pressure) / 2
-      ctx.lineWidth = Math.max(0.5, pressure * 3.5)
+      ctx.lineWidth = Math.max(0.5, pressure * strokeWidth * 2)
       ctx.beginPath()
       ctx.moveTo(p0.x, p0.y)
       ctx.lineTo(p1.x, p1.y)
+      ctx.stroke()
+    }
+
+    // Close the stroke outline if path is closed
+    if (closed) {
+      const pLast = rotatePoint(
+        points[points.length - 1].x,
+        points[points.length - 1].y,
+        cx,
+        cy,
+        alpha,
+      )
+      const pFirst = rotatePoint(points[0].x, points[0].y, cx, cy, alpha)
+      const pressure = points[points.length - 1].pressure
+      ctx.lineWidth = Math.max(0.5, pressure * strokeWidth * 2)
+      ctx.beginPath()
+      ctx.moveTo(pLast.x, pLast.y)
+      ctx.lineTo(pFirst.x, pFirst.y)
       ctx.stroke()
     }
   }
@@ -94,29 +131,32 @@ interface RenderState {
   cx: number
   cy: number
   selectedTool: string
+  activeStroke: string
+  activeFill: string
+  activeStrokeWidth: number
 }
 
 export default function SymmetryCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const liveRef = useRef<StrokePoint[]>([])
   const isDrawingRef = useRef(false)
-  // Palm rejection: track which pointer id + type is currently drawing
   const activePointerIdRef = useRef<number | null>(null)
   const activePointerTypeRef = useRef<string | null>(null)
 
-  // Single ref that the persistent rAF loop reads — avoids restarting the loop
   const rs = useRef<RenderState>({
     objects: useStore.getState().objects,
     symmetrySteps: useStore.getState().symmetrySteps,
     cx: useStore.getState().symmetryCenter?.x ?? window.innerWidth / 2,
     cy: useStore.getState().symmetryCenter?.y ?? window.innerHeight / 2,
     selectedTool: useStore.getState().selectedTool,
+    activeStroke: useStore.getState().activeStroke,
+    activeFill: useStore.getState().activeFill,
+    activeStrokeWidth: useStore.getState().activeStrokeWidth,
   })
 
   const addPath = useStore((s) => s.addPath)
   const selectedTool = useStore((s) => s.selectedTool)
 
-  // Sync Zustand state into the render-state ref (no loop restart needed)
   useEffect(
     () =>
       useStore.subscribe((s) => {
@@ -125,11 +165,13 @@ export default function SymmetryCanvas() {
         rs.current.cx = s.symmetryCenter?.x ?? window.innerWidth / 2
         rs.current.cy = s.symmetryCenter?.y ?? window.innerHeight / 2
         rs.current.selectedTool = s.selectedTool
+        rs.current.activeStroke = s.activeStroke
+        rs.current.activeFill = s.activeFill
+        rs.current.activeStrokeWidth = s.activeStrokeWidth
       }),
     [],
   )
 
-  // Cancel live stroke when leaving draw mode
   useEffect(() => {
     if (selectedTool !== 'draw') {
       liveRef.current = []
@@ -137,7 +179,6 @@ export default function SymmetryCanvas() {
     }
   }, [selectedTool])
 
-  // Canvas sizing — physical pixels = CSS pixels × DPR
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -148,7 +189,6 @@ export default function SymmetryCanvas() {
       canvas.height = Math.round(window.innerHeight * dpr)
       canvas.style.width = `${window.innerWidth}px`
       canvas.style.height = `${window.innerHeight}px`
-      // Refresh viewport-center fallback
       if (!useStore.getState().symmetryCenter) {
         rs.current.cx = window.innerWidth / 2
         rs.current.cy = window.innerHeight / 2
@@ -160,7 +200,6 @@ export default function SymmetryCanvas() {
     return () => window.removeEventListener('resize', applySize)
   }, [])
 
-  // Persistent rAF loop — reads rs.current and liveRef.current every frame
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -171,22 +210,53 @@ export default function SymmetryCanvas() {
       const ctx = canvas.getContext('2d')!
       const w = window.innerWidth
       const h = window.innerHeight
-      const { objects, symmetrySteps, cx, cy, selectedTool } = rs.current
+      const {
+        objects,
+        symmetrySteps,
+        cx,
+        cy,
+        selectedTool,
+        activeStroke,
+        activeStrokeWidth,
+      } = rs.current
 
       ctx.save()
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-      ctx.clearRect(0, 0, w, h)
+
+      // White canvas background
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, w, h)
 
       drawGrid(ctx, w, h)
 
       for (const obj of objects) {
         if (obj.type === 'path') {
-          drawStroke(ctx, obj.points, obj.steps, obj.centerX, obj.centerY, obj.style.stroke)
+          drawStroke(
+            ctx,
+            obj.points,
+            obj.steps,
+            obj.centerX,
+            obj.centerY,
+            obj.style.stroke,
+            obj.style.strokeWidth,
+            obj.style.fill,
+            obj.closed,
+          )
         }
       }
 
       if (liveRef.current.length >= 2) {
-        drawStroke(ctx, liveRef.current, symmetrySteps, cx, cy, '#6366f1')
+        drawStroke(
+          ctx,
+          liveRef.current,
+          symmetrySteps,
+          cx,
+          cy,
+          activeStroke,
+          activeStrokeWidth,
+          'none',
+          false,
+        )
       }
 
       if (selectedTool === 'draw') {
@@ -199,22 +269,19 @@ export default function SymmetryCanvas() {
 
     rafId = requestAnimationFrame(render)
     return () => cancelAnimationFrame(rafId)
-  }, []) // Intentionally empty — loop reads live refs, never needs restarting
+  }, [])
 
   // ── Pointer handlers ──────────────────────────────────────────────────
 
   const onPointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     if (rs.current.selectedTool !== 'draw') return
 
-    // ── Palm rejection ────────────────────────────────────────────────────
-    // If a pen stroke is already active, ignore any touch (hand resting on screen)
     if (activePointerIdRef.current !== null) {
       if (e.pointerType === 'pen' && activePointerTypeRef.current === 'touch') {
-        // Pen overrides finger — discard the touch stroke and start fresh
         liveRef.current = []
         isDrawingRef.current = false
       } else {
-        return // Only one active stroke at a time
+        return
       }
     }
 
@@ -227,9 +294,8 @@ export default function SymmetryCanvas() {
 
   const onPointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDrawingRef.current) return
-    if (e.pointerId !== activePointerIdRef.current) return // reject stray pointers
+    if (e.pointerId !== activePointerIdRef.current) return
 
-    // getCoalescedEvents gives Apple Pencil all sub-frame points
     const evts = (e.nativeEvent as PointerEvent).getCoalescedEvents?.() ?? [e.nativeEvent]
     for (const ev of evts) {
       liveRef.current.push({ x: ev.clientX, y: ev.clientY, pressure: ev.pressure || 0.5 })
@@ -249,7 +315,12 @@ export default function SymmetryCanvas() {
       liveRef.current = []
       if (pts.length < 2) return
 
-      const { cx, cy, symmetrySteps } = rs.current
+      const { cx, cy, symmetrySteps, activeStroke, activeFill, activeStrokeWidth } = rs.current
+
+      // Detect closed path: first and last point within 24px
+      const dist = Math.hypot(pts[pts.length - 1].x - pts[0].x, pts[pts.length - 1].y - pts[0].y)
+      const closed = dist < 24
+
       addPath({
         id: generateId(),
         type: 'path',
@@ -257,7 +328,13 @@ export default function SymmetryCanvas() {
         steps: symmetrySteps,
         centerX: cx,
         centerY: cy,
-        style: { stroke: '#6366f1', strokeWidth: 1.5, fill: 'none', opacity: 1 },
+        closed,
+        style: {
+          stroke: activeStroke,
+          strokeWidth: activeStrokeWidth,
+          fill: closed ? activeFill : 'none',
+          opacity: 1,
+        },
       })
     },
     [addPath],

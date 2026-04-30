@@ -33,8 +33,8 @@ export function renderObjectsToCanvas(
 
   const ctx = canvas.getContext('2d')!
 
-  // Background
-  ctx.fillStyle = stencilMode ? '#ffffff' : '#0f0f11'
+  // Always white background — tattoo template aesthetic
+  ctx.fillStyle = '#ffffff'
   ctx.fillRect(0, 0, targetWidth, targetHeight)
 
   // Scale to fit (letterbox, preserve aspect ratio)
@@ -51,12 +51,12 @@ export function renderObjectsToCanvas(
 
   for (const obj of objects) {
     const stroke = stencilMode ? '#000000' : obj.style.stroke
-    const fill = stencilMode ? '#000000' : obj.style.fill
+    const fill = stencilMode ? obj.style.fill : obj.style.fill
 
     if (obj.type === 'point') {
       ctx.beginPath()
       ctx.arc(obj.x, obj.y, 4, 0, Math.PI * 2)
-      ctx.fillStyle = fill
+      ctx.fillStyle = stroke
       ctx.fill()
     } else if (obj.type === 'line') {
       ctx.strokeStyle = stroke
@@ -68,16 +68,53 @@ export function renderObjectsToCanvas(
     } else if (obj.type === 'circle') {
       ctx.strokeStyle = stroke
       ctx.lineWidth = obj.style.strokeWidth
-      ctx.fillStyle = 'none'
       ctx.beginPath()
       ctx.arc(obj.cx, obj.cy, obj.r, 0, Math.PI * 2)
+      if (fill !== 'none') {
+        ctx.fillStyle = stencilMode ? '#000000' : fill
+        ctx.fill()
+      }
       ctx.stroke()
     } else if (obj.type === 'path') {
-      ctx.strokeStyle = stroke
+      const pathFill = stencilMode
+        ? obj.closed && obj.style.fill !== 'none'
+          ? '#000000'
+          : 'none'
+        : obj.style.fill
+      const pathStroke = stroke
+      const pathStrokeWidth = obj.style.strokeWidth
 
       for (let s = 0; s < obj.steps; s++) {
         const alpha = (s / obj.steps) * Math.PI * 2
 
+        // Fill pass
+        if (pathFill !== 'none' && obj.closed) {
+          ctx.beginPath()
+          const fp = rotatePoint(
+            obj.points[0].x,
+            obj.points[0].y,
+            obj.centerX,
+            obj.centerY,
+            alpha,
+          )
+          ctx.moveTo(fp.x, fp.y)
+          for (let i = 1; i < obj.points.length; i++) {
+            const p = rotatePoint(
+              obj.points[i].x,
+              obj.points[i].y,
+              obj.centerX,
+              obj.centerY,
+              alpha,
+            )
+            ctx.lineTo(p.x, p.y)
+          }
+          ctx.closePath()
+          ctx.fillStyle = pathFill
+          ctx.fill()
+        }
+
+        // Stroke pass — pressure-sensitive
+        ctx.strokeStyle = pathStroke
         for (let i = 1; i < obj.points.length; i++) {
           const p0 = rotatePoint(
             obj.points[i - 1].x,
@@ -94,10 +131,33 @@ export function renderObjectsToCanvas(
             alpha,
           )
           const pressure = (obj.points[i - 1].pressure + obj.points[i].pressure) / 2
-          ctx.lineWidth = Math.max(0.5, pressure * 3.5)
+          ctx.lineWidth = Math.max(0.5, pressure * pathStrokeWidth * 2)
           ctx.beginPath()
           ctx.moveTo(p0.x, p0.y)
           ctx.lineTo(p1.x, p1.y)
+          ctx.stroke()
+        }
+
+        // Close stroke outline if path is closed
+        if (obj.closed) {
+          const pLast = rotatePoint(
+            obj.points[obj.points.length - 1].x,
+            obj.points[obj.points.length - 1].y,
+            obj.centerX,
+            obj.centerY,
+            alpha,
+          )
+          const pFirst = rotatePoint(
+            obj.points[0].x,
+            obj.points[0].y,
+            obj.centerX,
+            obj.centerY,
+            alpha,
+          )
+          ctx.lineWidth = Math.max(0.5, obj.points[obj.points.length - 1].pressure * pathStrokeWidth * 2)
+          ctx.beginPath()
+          ctx.moveTo(pLast.x, pLast.y)
+          ctx.lineTo(pFirst.x, pFirst.y)
           ctx.stroke()
         }
       }
@@ -153,7 +213,6 @@ export async function exportAsPDF(
   const canvas = renderObjectsToCanvas(objects, sourceWidth, sourceHeight, w, h, stencilMode)
   const dataUrl = canvas.toDataURL('image/png')
 
-  // Dynamic import keeps jsPDF out of the initial bundle
   const { jsPDF } = await import('jspdf')
   const pdf = new jsPDF({
     orientation: widthCm >= heightCm ? 'landscape' : 'portrait',

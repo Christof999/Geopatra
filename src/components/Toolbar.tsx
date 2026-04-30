@@ -17,6 +17,17 @@ const tools: Tool[] = [
   { id: 'draw', label: 'Zeichnen', icon: <PenLine size={18} />, shortcut: 'D' },
 ]
 
+const FILL_OPTIONS = [
+  { label: 'Keine', value: 'none' },
+  { label: '20%', value: 'rgba(0,0,0,0.20)' },
+  { label: '40%', value: 'rgba(0,0,0,0.40)' },
+  { label: '60%', value: 'rgba(0,0,0,0.60)' },
+  { label: '80%', value: 'rgba(0,0,0,0.80)' },
+  { label: 'Voll', value: '#1a1a1a' },
+]
+
+const STROKE_WIDTHS = [0.5, 1, 2, 3.5]
+
 export default function Toolbar() {
   const { selectedTool, setTool, undo, clear, objects, history } = useStore()
 
@@ -56,7 +67,76 @@ export default function Toolbar() {
           destructive
         />
       </div>
+
+      {/* Style group */}
+      <StylePanel />
     </motion.div>
+  )
+}
+
+function StylePanel() {
+  const { activeFill, activeStrokeWidth, setActiveFill, setActiveStrokeWidth } = useStore()
+
+  return (
+    <div className="bg-surface border border-border rounded-xl p-2 shadow-2xl" style={{ width: 100 }}>
+      {/* Fill */}
+      <p className="text-[9px] text-gray-600 uppercase tracking-wider px-0.5 mb-1.5">Füllung</p>
+      <div className="grid grid-cols-3 gap-1 mb-2">
+        {FILL_OPTIONS.map(({ label, value }) => (
+          <button
+            key={value}
+            onClick={() => setActiveFill(value)}
+            title={label}
+            className="h-7 rounded-md flex items-center justify-center transition-all"
+            style={{
+              background: value === 'none' ? 'transparent' : value,
+              outline:
+                activeFill === value
+                  ? '2px solid #6b7280'
+                  : '1.5px solid rgba(255,255,255,0.12)',
+              outlineOffset: activeFill === value ? '1px' : '0px',
+            }}
+          >
+            {value === 'none' && (
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <line
+                  x1="1"
+                  y1="11"
+                  x2="11"
+                  y2="1"
+                  stroke="#6b7280"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+              </svg>
+            )}
+          </button>
+        ))}
+      </div>
+
+      <div className="h-px bg-border mb-2" />
+
+      {/* Stroke width */}
+      <p className="text-[9px] text-gray-600 uppercase tracking-wider px-0.5 mb-1.5">Stärke</p>
+      <div className="flex flex-col gap-0.5">
+        {STROKE_WIDTHS.map((w) => (
+          <button
+            key={w}
+            onClick={() => setActiveStrokeWidth(w)}
+            title={`${w}px`}
+            className={`w-full h-7 rounded-md flex items-center gap-2 px-1.5 transition-colors ${
+              activeStrokeWidth === w ? 'bg-white/10' : 'hover:bg-white/5'
+            }`}
+          >
+            <div
+              className="rounded-full bg-gray-400 shrink-0"
+              style={{ width: 22, height: Math.max(1, Math.min(w, 5)) }}
+            />
+            <span className="text-[10px] text-gray-500 tabular-nums">{w}</span>
+          </button>
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -89,7 +169,7 @@ function ToolButton({
         <motion.span
           layoutId="active-tool"
           className="absolute inset-0 rounded-lg bg-accent -z-10"
-          transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+          transition={{ type: 'spring' as const, stiffness: 400, damping: 35 }}
         />
       )}
     </motion.button>
