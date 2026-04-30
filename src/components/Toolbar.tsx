@@ -1,21 +1,6 @@
 import { motion } from 'framer-motion'
-import { Dot, Minus, Circle, Trash2, Undo2, PenLine } from 'lucide-react'
+import { Trash2, Undo2 } from 'lucide-react'
 import { useStore } from '../store'
-import type { ToolType } from '../types'
-
-interface Tool {
-  id: ToolType
-  label: string
-  icon: React.ReactNode
-  shortcut: string
-}
-
-const tools: Tool[] = [
-  { id: 'point', label: 'Punkt', icon: <Dot size={20} />, shortcut: 'P' },
-  { id: 'line', label: 'Linie', icon: <Minus size={20} />, shortcut: 'L' },
-  { id: 'circle', label: 'Kreis', icon: <Circle size={20} />, shortcut: 'C' },
-  { id: 'draw', label: 'Zeichnen', icon: <PenLine size={18} />, shortcut: 'D' },
-]
 
 const FILL_OPTIONS = [
   { label: 'Keine', value: 'none' },
@@ -29,7 +14,7 @@ const FILL_OPTIONS = [
 const STROKE_WIDTHS = [0.5, 1, 2, 3.5]
 
 export default function Toolbar() {
-  const { selectedTool, setTool, undo, clear, objects, history } = useStore()
+  const { undo, clear, objects, history } = useStore()
 
   return (
     <motion.div
@@ -38,17 +23,8 @@ export default function Toolbar() {
       transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
       className="absolute safe-left top-1/2 -translate-y-1/2 z-10 flex flex-col gap-1"
     >
-      {/* Tool group */}
-      <div className="bg-surface border border-border rounded-xl p-1.5 flex flex-col gap-1 shadow-2xl">
-        {tools.map((tool) => (
-          <ToolButton
-            key={tool.id}
-            tool={tool}
-            active={selectedTool === tool.id}
-            onClick={() => setTool(tool.id)}
-          />
-        ))}
-      </div>
+      {/* Style panel — fill swatches + stroke width */}
+      <StylePanel />
 
       {/* Action group */}
       <div className="bg-surface border border-border rounded-xl p-1.5 flex flex-col gap-1 shadow-2xl">
@@ -67,9 +43,6 @@ export default function Toolbar() {
           destructive
         />
       </div>
-
-      {/* Style group */}
-      <StylePanel />
     </motion.div>
   )
 }
@@ -137,42 +110,6 @@ function StylePanel() {
         ))}
       </div>
     </div>
-  )
-}
-
-function ToolButton({
-  tool,
-  active,
-  onClick,
-}: {
-  tool: Tool
-  active: boolean
-  onClick: () => void
-}) {
-  return (
-    <motion.button
-      onClick={onClick}
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.95 }}
-      title={`${tool.label} (${tool.shortcut})`}
-      className={`
-        relative w-11 h-11 rounded-lg flex items-center justify-center
-        transition-colors duration-150
-        ${active
-          ? 'bg-accent text-white shadow-lg shadow-accent/30'
-          : 'text-gray-400 hover:text-gray-200 hover:bg-subtle'
-        }
-      `}
-    >
-      {tool.icon}
-      {active && (
-        <motion.span
-          layoutId="active-tool"
-          className="absolute inset-0 rounded-lg bg-accent -z-10"
-          transition={{ type: 'spring' as const, stiffness: 400, damping: 35 }}
-        />
-      )}
-    </motion.button>
   )
 }
 

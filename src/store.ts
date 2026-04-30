@@ -57,7 +57,7 @@ interface StoreState {
 
 export const useStore = create<StoreState>((set, get) => ({
   objects: [],
-  selectedTool: 'point',
+  selectedTool: 'draw',
   snapThreshold: 12,
   history: [],
   pendingLine: null,
