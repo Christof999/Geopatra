@@ -11,6 +11,8 @@ function getCursorClass(tool: string): string {
       return 'cursor-crosshair'
     case 'circle':
       return 'cursor-crosshair'
+    case 'fill':
+      return 'cursor-cell'
     default:
       return 'cursor-default'
   }

@@ -1,4 +1,4 @@
-export type ToolType = 'point' | 'line' | 'circle' | 'draw'
+export type ToolType = 'point' | 'line' | 'circle' | 'draw' | 'fill'
 
 export interface Point {
   x: number

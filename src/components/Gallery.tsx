@@ -51,12 +51,25 @@ export default function Gallery() {
 
   useEffect(() => {
     if (!galleryOpen || !configured) return
-    setLoading(true)
-    setError(null)
-    loadDesigns()
-      .then(setDesigns)
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false))
+    let cancelled = false
+    queueMicrotask(() => {
+      if (cancelled) return
+      setLoading(true)
+      setError(null)
+      loadDesigns()
+        .then((data) => {
+          if (!cancelled) setDesigns(data)
+        })
+        .catch((e) => {
+          if (!cancelled) setError(e.message)
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false)
+        })
+    })
+    return () => {
+      cancelled = true
+    }
   }, [galleryOpen, configured])
 
   const filtered = useMemo(() => {

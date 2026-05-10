@@ -1,4 +1,5 @@
 import { rotatePoint } from '../utils/geometry'
+import { isPatternFill, resolveFillStyle } from '../utils/canvasFill'
 import type { GeoObject } from '../types'
 
 export const EXPORT_DPI = 300
@@ -33,9 +34,12 @@ export function renderObjectsToCanvas(
 
   const ctx = canvas.getContext('2d')!
 
-  // Always white background — tattoo template aesthetic
-  ctx.fillStyle = '#ffffff'
-  ctx.fillRect(0, 0, targetWidth, targetHeight)
+  // Schablonen-Export: transparenter Hintergrund (kein weißes Blatt).
+  // Farbmodus: weißer Grund für bessere Lesbarkeit beim Druck / Galerie.
+  if (!stencilMode) {
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, targetWidth, targetHeight)
+  }
 
   // Scale to fit (letterbox, preserve aspect ratio)
   const scale = Math.min(targetWidth / sourceWidth, targetHeight / sourceHeight)
@@ -76,13 +80,17 @@ export function renderObjectsToCanvas(
       }
       ctx.stroke()
     } else if (obj.type === 'path') {
-      const pathFill = stencilMode
-        ? obj.closed && obj.style.fill !== 'none'
-          ? '#000000'
+      const pathFillRaw = obj.style.fill
+      const pathFillStencil =
+        obj.closed && pathFillRaw !== 'none'
+          ? isPatternFill(pathFillRaw)
+            ? pathFillRaw
+            : '#000000'
           : 'none'
-        : obj.style.fill
+      const pathFill = stencilMode ? pathFillStencil : pathFillRaw
       const pathStroke = stroke
       const pathStrokeWidth = obj.style.strokeWidth
+      const fillDotColor = stencilMode ? '#000000' : pathStroke
 
       for (let s = 0; s < obj.steps; s++) {
         const alpha = (s / obj.steps) * Math.PI * 2
@@ -109,8 +117,11 @@ export function renderObjectsToCanvas(
             ctx.lineTo(p.x, p.y)
           }
           ctx.closePath()
-          ctx.fillStyle = pathFill
-          ctx.fill()
+          const fs = resolveFillStyle(ctx, pathFill, fillDotColor)
+          if (fs !== 'none') {
+            ctx.fillStyle = fs
+            ctx.fill()
+          }
         }
 
         // Stroke pass — pressure-sensitive
