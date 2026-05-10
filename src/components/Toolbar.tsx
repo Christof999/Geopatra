@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion'
-import { Trash2, Undo2, Paintbrush2 } from 'lucide-react'
+import type { CSSProperties } from 'react'
+import { Trash2, Undo2, Paintbrush2, Paintbrush, PaintBucket } from 'lucide-react'
 import { useStore } from '../store'
 
 const FILL_OPTIONS = [
@@ -9,9 +10,44 @@ const FILL_OPTIONS = [
   { label: '60%', value: 'rgba(0,0,0,0.60)' },
   { label: '80%', value: 'rgba(0,0,0,0.80)' },
   { label: 'Voll', value: '#1a1a1a' },
+  { label: 'Dots fein', value: 'pat:dot-fine' },
+  { label: 'Dots grob', value: 'pat:dot-coarse' },
+  { label: 'Mandala', value: 'pat:dot-mandala' },
 ]
 
 const STROKE_WIDTHS = [0.5, 1, 2, 3.5]
+
+function patternSwatchStyle(pat: string): CSSProperties {
+  switch (pat) {
+    case 'pat:dot-fine':
+      return {
+        backgroundColor: 'rgba(255,255,255,0.04)',
+        backgroundImage: 'radial-gradient(circle, #9ca3af 0.65px, transparent 0.7px)',
+        backgroundSize: '5px 5px',
+      }
+    case 'pat:dot-coarse':
+      return {
+        backgroundColor: 'rgba(255,255,255,0.04)',
+        backgroundImage: 'radial-gradient(circle, #9ca3af 1.1px, transparent 1.15px)',
+        backgroundSize: '10px 10px',
+      }
+    case 'pat:dot-mandala':
+      return {
+        backgroundColor: 'rgba(255,255,255,0.04)',
+        backgroundImage:
+          'radial-gradient(circle at 25% 25%, #9ca3af 0.65px, transparent 0.7px), radial-gradient(circle at 75% 25%, #9ca3af 0.65px, transparent 0.7px), radial-gradient(circle at 50% 50%, #9ca3af 0.65px, transparent 0.7px), radial-gradient(circle at 25% 75%, #9ca3af 0.65px, transparent 0.7px), radial-gradient(circle at 75% 75%, #9ca3af 0.65px, transparent 0.7px)',
+        backgroundSize: '14px 14px',
+      }
+    default:
+      return { backgroundColor: 'rgba(255,255,255,0.04)' }
+  }
+}
+
+function swatchBackground(value: string): CSSProperties {
+  if (value === 'none') return { background: 'rgba(255,255,255,0.04)' }
+  if (value.startsWith('pat:')) return patternSwatchStyle(value)
+  return { background: value }
+}
 
 export default function Toolbar() {
   const { undo, clear, objects, history } = useStore()
@@ -57,23 +93,45 @@ export default function Toolbar() {
 }
 
 function StylePanel() {
-  const { activeFill, activeStrokeWidth, setActiveFill, setActiveStrokeWidth } = useStore()
+  const {
+    selectedTool,
+    setTool,
+    activeFill,
+    activeStrokeWidth,
+    setActiveFill,
+    setActiveStrokeWidth,
+  } = useStore()
 
-  const fillLabel =
-    activeFill === 'none'
-      ? 'Keine Füllung'
-      : activeFill === '#1a1a1a'
-        ? 'Vollständig'
-        : activeFill.includes('0.20')
-          ? '20%'
-          : activeFill.includes('0.40')
-            ? '40%'
-            : activeFill.includes('0.60')
-              ? '60%'
-              : '80%'
+  const fillLabel = FILL_OPTIONS.find((o) => o.value === activeFill)?.label ?? 'Füllung'
 
   return (
     <div className="bg-surface border border-border rounded-xl p-2 shadow-2xl" style={{ width: 108 }}>
+      <p className="text-[9px] text-gray-600 uppercase tracking-wider px-0.5 mb-1.5">Werkzeug</p>
+      <div className="flex gap-1 mb-2">
+        <button
+          type="button"
+          title="Freihand zeichnen"
+          onClick={() => setTool('draw')}
+          className={`flex-1 h-8 rounded-md flex items-center justify-center transition-colors ${
+            selectedTool === 'draw' ? 'bg-accent/25 text-accent ring-1 ring-accent/40' : 'bg-canvas hover:bg-subtle text-gray-400'
+          }`}
+        >
+          <Paintbrush size={16} />
+        </button>
+        <button
+          type="button"
+          title="Geschlossene Fläche füllen (wie in Paint)"
+          onClick={() => setTool('fill')}
+          className={`flex-1 h-8 rounded-md flex items-center justify-center transition-colors ${
+            selectedTool === 'fill' ? 'bg-accent/25 text-accent ring-1 ring-accent/40' : 'bg-canvas hover:bg-subtle text-gray-400'
+          }`}
+        >
+          <PaintBucket size={16} />
+        </button>
+      </div>
+
+      <div className="h-px bg-border mb-2" />
+
       {/* Active fill indicator — the "brush" */}
       <div className="flex items-center gap-1.5 mb-2 px-0.5">
         <Paintbrush2 size={13} className="text-gray-400 shrink-0" />
@@ -82,7 +140,7 @@ function StylePanel() {
           <div
             className="w-5 h-5 rounded shrink-0"
             style={{
-              background: activeFill === 'none' ? 'transparent' : activeFill,
+              ...swatchBackground(activeFill),
               border: '1.5px solid rgba(255,255,255,0.2)',
               position: 'relative',
               overflow: 'hidden',
@@ -116,7 +174,7 @@ function StylePanel() {
               title={label}
               className="h-8 rounded-md flex items-center justify-center transition-all relative"
               style={{
-                background: value === 'none' ? 'rgba(255,255,255,0.04)' : value,
+                ...swatchBackground(value),
                 outline: isActive ? '2px solid #d1d5db' : '1.5px solid rgba(255,255,255,0.1)',
                 outlineOffset: isActive ? '1px' : '0px',
               }}

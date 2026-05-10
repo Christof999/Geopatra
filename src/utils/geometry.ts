@@ -1,4 +1,4 @@
-import type { GeoObject, Point } from '../types'
+import type { GeoObject, GeoPath, Point } from '../types'
 
 export function euclidean(a: Point, b: Point): number {
   const dx = b.x - a.x
@@ -81,4 +81,31 @@ export function rotatePoint(
 
 export function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+}
+
+/** Ray casting — Punkt in einfachem Polygon (Kontur = Pfadpunkte). */
+export function pointInPolygon(px: number, py: number, poly: Point[]): boolean {
+  if (poly.length < 3) return false
+  let inside = false
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i].x
+    const yi = poly[i].y
+    const xj = poly[j].x
+    const yj = poly[j].y
+    const cross = (yi > py) !== (yj > py) && px < ((xj - xi) * (py - yi)) / (yj - yi + 1e-12) + xi
+    if (cross) inside = !inside
+  }
+  return inside
+}
+
+/** True wenn (px,py) im Inneren einer geschlossenen Pfadkontur liegt (inkl. aller Symmetrie-Kopien). */
+export function pointInClosedPath(px: number, py: number, path: GeoPath): boolean {
+  if (!path.closed || path.points.length < 3) return false
+  const { centerX, centerY, steps, points } = path
+  for (let s = 0; s < steps; s++) {
+    const alpha = (s / steps) * Math.PI * 2
+    const poly = points.map((p) => rotatePoint(p.x, p.y, centerX, centerY, alpha))
+    if (pointInPolygon(px, py, poly)) return true
+  }
+  return false
 }

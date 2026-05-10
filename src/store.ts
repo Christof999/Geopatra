@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { DesignDoc, GeoObject, GeoPath, ToolType, Point } from './types'
-import { generateId } from './utils/geometry'
+import { generateId, pointInClosedPath } from './utils/geometry'
 
 const DEFAULT_STYLE = {
   stroke: '#1a1a1a',
@@ -48,6 +48,7 @@ interface StoreState {
   setSaveModalOpen: (open: boolean) => void
 
   handleCanvasClick: (point: Point) => void
+  applyBucketFill: (point: Point) => void
   addPath: (path: GeoPath) => void
   loadDesign: (design: DesignDoc) => void
 
@@ -74,7 +75,7 @@ export const useStore = create<StoreState>((set, get) => ({
       selectedTool: tool,
       pendingLine: null,
       pendingCircleCenter: null,
-      ghostPoint: tool === 'draw' ? null : get().ghostPoint,
+      ghostPoint: tool === 'draw' || tool === 'fill' ? null : get().ghostPoint,
     }),
 
   setGhostPoint: (p) => set({ ghostPoint: p }),
@@ -103,6 +104,23 @@ export const useStore = create<StoreState>((set, get) => ({
       symmetrySteps: design.symmetrySteps,
       galleryOpen: false,
     })
+  },
+
+  applyBucketFill: (point) => {
+    const { objects, history, activeFill } = get()
+    const { x: px, y: py } = point
+    for (let i = objects.length - 1; i >= 0; i--) {
+      const obj = objects[i]
+      if (obj.type !== 'path') continue
+      if (!pointInClosedPath(px, py, obj)) continue
+      const next = objects.slice()
+      next[i] = {
+        ...obj,
+        style: { ...obj.style, fill: activeFill },
+      }
+      set({ history: [...history, objects], objects: next })
+      return
+    }
   },
 
   handleCanvasClick: (point) => {

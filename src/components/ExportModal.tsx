@@ -139,13 +139,13 @@ export default function ExportModal() {
                     active={!stencil}
                     onClick={() => setStencil(false)}
                     label="Farbig"
-                    desc="Dunkler Hintergrund, farbige Striche"
+                    desc="Weißer Hintergrund, Striche und Füllungen wie auf dem Bildschirm"
                   />
                   <ModeOption
                     active={stencil}
                     onClick={() => setStencil(true)}
                     label="Schablone"
-                    desc="Weißer Grund, schwarze Outlines — druckfertig"
+                    desc="Transparenter Hintergrund, schwarze Linien und Flächen — für Film & Transfer"
                   />
                 </div>
               </section>

@@ -1,6 +1,7 @@
 import { useRef, useEffect, useCallback } from 'react'
 import { useStore } from '../store'
 import { rotatePoint, generateId } from '../utils/geometry'
+import { resolveFillStyle } from '../utils/canvasFill'
 import type { GeoObject, StrokePoint } from '../types'
 
 // ── Pure canvas drawing helpers (no React) ────────────────────────────────
@@ -86,8 +87,11 @@ function drawStroke(
         ctx.lineTo(p.x, p.y)
       }
       if (closed) ctx.closePath()
-      ctx.fillStyle = fill
-      ctx.fill()
+      const fs = resolveFillStyle(ctx, fill, stroke)
+      if (fs !== 'none') {
+        ctx.fillStyle = fs
+        ctx.fill()
+      }
     }
 
     // Stroke pass — pressure-sensitive segments
@@ -155,6 +159,7 @@ export default function SymmetryCanvas() {
   })
 
   const addPath = useStore((s) => s.addPath)
+  const applyBucketFill = useStore((s) => s.applyBucketFill)
   const selectedTool = useStore((s) => s.selectedTool)
 
   useEffect(
@@ -273,24 +278,32 @@ export default function SymmetryCanvas() {
 
   // ── Pointer handlers ──────────────────────────────────────────────────
 
-  const onPointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (rs.current.selectedTool !== 'draw') return
-
-    if (activePointerIdRef.current !== null) {
-      if (e.pointerType === 'pen' && activePointerTypeRef.current === 'touch') {
-        liveRef.current = []
-        isDrawingRef.current = false
-      } else {
+  const onPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLCanvasElement>) => {
+      if (rs.current.selectedTool === 'fill') {
+        applyBucketFill({ x: e.clientX, y: e.clientY })
         return
       }
-    }
 
-    e.currentTarget.setPointerCapture(e.pointerId)
-    activePointerIdRef.current = e.pointerId
-    activePointerTypeRef.current = e.pointerType
-    isDrawingRef.current = true
-    liveRef.current = [{ x: e.clientX, y: e.clientY, pressure: e.pressure || 0.5 }]
-  }, [])
+      if (rs.current.selectedTool !== 'draw') return
+
+      if (activePointerIdRef.current !== null) {
+        if (e.pointerType === 'pen' && activePointerTypeRef.current === 'touch') {
+          liveRef.current = []
+          isDrawingRef.current = false
+        } else {
+          return
+        }
+      }
+
+      e.currentTarget.setPointerCapture(e.pointerId)
+      activePointerIdRef.current = e.pointerId
+      activePointerTypeRef.current = e.pointerType
+      isDrawingRef.current = true
+      liveRef.current = [{ x: e.clientX, y: e.clientY, pressure: e.pressure || 0.5 }]
+    },
+    [applyBucketFill],
+  )
 
   const onPointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDrawingRef.current) return
@@ -315,7 +328,7 @@ export default function SymmetryCanvas() {
       liveRef.current = []
       if (pts.length < 2) return
 
-      const { cx, cy, symmetrySteps, activeStroke, activeFill, activeStrokeWidth } = rs.current
+      const { cx, cy, symmetrySteps, activeStroke, activeStrokeWidth } = rs.current
 
       // Detect closed path: first and last point within 24px
       const dist = Math.hypot(pts[pts.length - 1].x - pts[0].x, pts[pts.length - 1].y - pts[0].y)
@@ -332,7 +345,7 @@ export default function SymmetryCanvas() {
         style: {
           stroke: activeStroke,
           strokeWidth: activeStrokeWidth,
-          fill: closed ? activeFill : 'none',
+          fill: 'none',
           opacity: 1,
         },
       })
@@ -346,8 +359,13 @@ export default function SymmetryCanvas() {
       className="absolute inset-0"
       style={{
         touchAction: 'none',
-        pointerEvents: selectedTool === 'draw' ? 'auto' : 'none',
-        cursor: selectedTool === 'draw' ? 'crosshair' : 'default',
+        pointerEvents: selectedTool === 'draw' || selectedTool === 'fill' ? 'auto' : 'none',
+        cursor:
+          selectedTool === 'draw'
+            ? 'crosshair'
+            : selectedTool === 'fill'
+              ? 'cell'
+              : 'default',
       }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
