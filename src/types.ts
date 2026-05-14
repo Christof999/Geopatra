@@ -38,6 +38,8 @@ export interface StrokePoint {
   pressure: number
 }
 
+export type PathStepFills = Record<number, string>
+
 export interface GeoPath {
   id: string
   type: 'path'
@@ -46,6 +48,7 @@ export interface GeoPath {
   centerX: number
   centerY: number
   closed: boolean
+  stepFills?: PathStepFills
   style: ShapeStyle
 }
 

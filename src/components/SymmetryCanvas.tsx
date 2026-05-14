@@ -2,7 +2,7 @@ import { useRef, useEffect, useCallback } from 'react'
 import { useStore } from '../store'
 import { rotatePoint, generateId, isStrokeClosed } from '../utils/geometry'
 import { resolveFillStyle } from '../utils/canvasFill'
-import type { GeoObject, StrokePoint } from '../types'
+import type { GeoObject, PathStepFills, StrokePoint } from '../types'
 
 // ── Pure canvas drawing helpers (no React) ────────────────────────────────
 
@@ -134,6 +134,7 @@ function drawStroke(
   stroke: string,
   strokeWidth: number,
   fill: string,
+  stepFills: PathStepFills | undefined,
   closed: boolean,
 ) {
   if (points.length < 2) return
@@ -142,9 +143,10 @@ function drawStroke(
 
   for (let s = 0; s < steps; s++) {
     const alpha = (s / steps) * Math.PI * 2
+    const stepFill = stepFills ? stepFills[s] ?? 'none' : fill
 
     // Fill pass — build the complete path outline, then fill
-    if (fill !== 'none') {
+    if (stepFill !== 'none' && closed) {
       ctx.beginPath()
       const fp = rotatePoint(points[0].x, points[0].y, cx, cy, alpha)
       ctx.moveTo(fp.x, fp.y)
@@ -152,8 +154,8 @@ function drawStroke(
         const p = rotatePoint(points[i].x, points[i].y, cx, cy, alpha)
         ctx.lineTo(p.x, p.y)
       }
-      if (closed) ctx.closePath()
-      const fs = resolveFillStyle(ctx, fill, stroke)
+      ctx.closePath()
+      const fs = resolveFillStyle(ctx, stepFill, stroke)
       if (fs !== 'none') {
         ctx.fillStyle = fs
         ctx.fill()
@@ -316,6 +318,7 @@ export default function SymmetryCanvas() {
             obj.style.stroke,
             obj.style.strokeWidth,
             obj.style.fill,
+            obj.stepFills,
             obj.closed,
           )
         }
@@ -331,6 +334,7 @@ export default function SymmetryCanvas() {
           activeStroke,
           activeStrokeWidth,
           'none',
+          undefined,
           false,
         )
       }

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { DesignDoc, GeoObject, GeoPath, ToolType, Point } from './types'
-import { generateId, isPathFillable, pointInClosedPath } from './utils/geometry'
+import { generateId, hitClosedPathStep, isPathFillable } from './utils/geometry'
+import { setPathStepFill } from './utils/pathFill'
 
 const DEFAULT_STYLE = {
   stroke: '#1a1a1a',
@@ -112,12 +113,12 @@ export const useStore = create<StoreState>((set, get) => ({
     for (let i = objects.length - 1; i >= 0; i--) {
       const obj = objects[i]
       if (obj.type !== 'path') continue
-      if (!pointInClosedPath(px, py, obj)) continue
+      const hitStep = hitClosedPathStep(px, py, obj)
+      if (hitStep === null) continue
       const next = objects.slice()
       next[i] = {
-        ...obj,
+        ...setPathStepFill(obj, hitStep, activeFill),
         closed: obj.closed || isPathFillable(obj),
-        style: { ...obj.style, fill: activeFill },
       }
       set({ history: [...history, objects], objects: next })
       return

@@ -219,14 +219,18 @@ export function pointInPolygon(px: number, py: number, poly: Point[]): boolean {
   return inside
 }
 
-/** True wenn (px,py) im Inneren einer geschlossenen Pfadkontur liegt (inkl. aller Symmetrie-Kopien). */
-export function pointInClosedPath(px: number, py: number, path: GeoPath): boolean {
-  if (!isPathFillable(path) || path.points.length < 3) return false
+/** Index der Symmetrie-Kopie, in deren geschlossener Pfadkontur (px,py) liegt. */
+export function hitClosedPathStep(px: number, py: number, path: GeoPath): number | null {
+  if (!isPathFillable(path) || path.points.length < 3) return null
   const { centerX, centerY, steps, points } = path
   for (let s = 0; s < steps; s++) {
     const alpha = (s / steps) * Math.PI * 2
     const poly = points.map((p) => rotatePoint(p.x, p.y, centerX, centerY, alpha))
-    if (pointInPolygon(px, py, poly)) return true
+    if (pointInPolygon(px, py, poly)) return s
   }
-  return false
+  return null
+}
+
+export function pointInClosedPath(px: number, py: number, path: GeoPath): boolean {
+  return hitClosedPathStep(px, py, path) !== null
 }
