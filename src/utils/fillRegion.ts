@@ -3,18 +3,18 @@ import { generateId, rotatePoint } from './geometry'
 import { resolveFillStyle } from './canvasFill'
 
 const WALL_ALPHA_THRESHOLD = 8
-const WALL_PADDING = 4
-const MASK_DILATION_PASSES = 2
-const MAX_SEED_SEARCH_RADIUS = 14
-const MAX_SEED_CANDIDATES = 96
+const WALL_PADDING = 2
+const GAP_CLOSE_ATTEMPTS = [0, 6, 12, 20, 32] as const
+const MAX_SEED_SEARCH_RADIUS = 24
+const MAX_SEED_CANDIDATES = 160
 const MIN_REGION_PIXELS = 4
-const FILL_OVERLAP_PADDING = MASK_DILATION_PASSES + 1
+const FILL_OVERLAP_PADDING = 3
 const renderedFillCache = new Map<string, HTMLCanvasElement>()
 
 type Seed = { x: number; y: number }
 type SeedCandidate = Seed & { distanceSq: number }
 
-function drawPathWalls(ctx: CanvasRenderingContext2D, path: GeoPath) {
+function drawPathWalls(ctx: CanvasRenderingContext2D, path: GeoPath, gapClose: number) {
   if (path.points.length < 2) return
 
   ctx.strokeStyle = '#000000'
@@ -40,7 +40,7 @@ function drawPathWalls(ctx: CanvasRenderingContext2D, path: GeoPath) {
         alpha,
       )
       const pressure = (path.points[i - 1].pressure + path.points[i].pressure) / 2
-      ctx.lineWidth = Math.max(1, pressure * path.style.strokeWidth * 2 + WALL_PADDING)
+      ctx.lineWidth = Math.max(1, pressure * path.style.strokeWidth * 2 + WALL_PADDING + gapClose)
       ctx.beginPath()
       ctx.moveTo(p0.x, p0.y)
       ctx.lineTo(p1.x, p1.y)
@@ -64,7 +64,7 @@ function drawPathWalls(ctx: CanvasRenderingContext2D, path: GeoPath) {
       )
       ctx.lineWidth = Math.max(
         1,
-        path.points[path.points.length - 1].pressure * path.style.strokeWidth * 2 + WALL_PADDING,
+        path.points[path.points.length - 1].pressure * path.style.strokeWidth * 2 + WALL_PADDING + gapClose,
       )
       ctx.beginPath()
       ctx.moveTo(pLast.x, pLast.y)
@@ -74,9 +74,9 @@ function drawPathWalls(ctx: CanvasRenderingContext2D, path: GeoPath) {
   }
 }
 
-function drawObjectWalls(ctx: CanvasRenderingContext2D, obj: GeoObject) {
+function drawObjectWalls(ctx: CanvasRenderingContext2D, obj: GeoObject, gapClose: number) {
   if (obj.type === 'path') {
-    drawPathWalls(ctx, obj)
+    drawPathWalls(ctx, obj, gapClose)
     return
   }
 
@@ -84,7 +84,7 @@ function drawObjectWalls(ctx: CanvasRenderingContext2D, obj: GeoObject) {
     ctx.strokeStyle = '#000000'
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
-    ctx.lineWidth = Math.max(1, obj.style.strokeWidth + WALL_PADDING)
+    ctx.lineWidth = Math.max(1, obj.style.strokeWidth + WALL_PADDING + gapClose)
     ctx.beginPath()
     ctx.moveTo(obj.x1, obj.y1)
     ctx.lineTo(obj.x2, obj.y2)
@@ -94,14 +94,19 @@ function drawObjectWalls(ctx: CanvasRenderingContext2D, obj: GeoObject) {
 
   if (obj.type === 'circle') {
     ctx.strokeStyle = '#000000'
-    ctx.lineWidth = Math.max(1, obj.style.strokeWidth + WALL_PADDING)
+    ctx.lineWidth = Math.max(1, obj.style.strokeWidth + WALL_PADDING + gapClose)
     ctx.beginPath()
     ctx.arc(obj.cx, obj.cy, obj.r, 0, Math.PI * 2)
     ctx.stroke()
   }
 }
 
-function buildWallMask(objects: GeoObject[], width: number, height: number): Uint8Array {
+function buildWallMask(
+  objects: GeoObject[],
+  width: number,
+  height: number,
+  gapClose: number,
+): Uint8Array {
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height
@@ -110,7 +115,7 @@ function buildWallMask(objects: GeoObject[], width: number, height: number): Uin
   ctx.clearRect(0, 0, width, height)
   for (const obj of objects) {
     if (obj.type === 'fillRegion') continue
-    drawObjectWalls(ctx, obj)
+    drawObjectWalls(ctx, obj, gapClose)
   }
 
   const data = ctx.getImageData(0, 0, width, height).data
@@ -119,41 +124,6 @@ function buildWallMask(objects: GeoObject[], width: number, height: number): Uin
     wall[i] = data[p + 3] > WALL_ALPHA_THRESHOLD ? 1 : 0
   }
   return wall
-}
-
-function dilateWallMask(
-  wall: Uint8Array,
-  width: number,
-  height: number,
-  passes: number,
-): Uint8Array {
-  let current = wall
-
-  for (let pass = 0; pass < passes; pass++) {
-    const next = current.slice()
-
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const index = y * width + x
-        if (current[index] === 0) continue
-
-        for (let dy = -1; dy <= 1; dy++) {
-          const ny = y + dy
-          if (ny < 0 || ny >= height) continue
-
-          for (let dx = -1; dx <= 1; dx++) {
-            const nx = x + dx
-            if (nx < 0 || nx >= width) continue
-            next[ny * width + nx] = 1
-          }
-        }
-      }
-    }
-
-    current = next
-  }
-
-  return current
 }
 
 function findSeedCandidates(
@@ -331,31 +301,29 @@ export function createBucketFillRegion(
 ): GeoFillRegion | null {
   const maskWidth = Math.max(1, Math.round(width))
   const maskHeight = Math.max(1, Math.round(height))
-  const wall = dilateWallMask(
-    buildWallMask(objects, maskWidth, maskHeight),
-    maskWidth,
-    maskHeight,
-    MASK_DILATION_PASSES,
-  )
-  const seeds = findSeedCandidates(wall, maskWidth, maskHeight, point)
-  if (seeds.length === 0) return null
 
-  for (const seed of seeds) {
-    const runs = floodFillRuns(wall, maskWidth, maskHeight, seed)
-    if (!runs) continue
+  for (const gapClose of GAP_CLOSE_ATTEMPTS) {
+    const wall = buildWallMask(objects, maskWidth, maskHeight, gapClose)
+    const seeds = findSeedCandidates(wall, maskWidth, maskHeight, point)
+    if (seeds.length === 0) continue
 
-    return {
-      id: generateId(),
-      type: 'fillRegion',
-      width: maskWidth,
-      height: maskHeight,
-      runs: expandRuns(runs, maskWidth, maskHeight, FILL_OVERLAP_PADDING),
-      style: {
-        stroke,
-        strokeWidth: 0,
-        fill,
-        opacity: 1,
-      },
+    for (const seed of seeds) {
+      const runs = floodFillRuns(wall, maskWidth, maskHeight, seed)
+      if (!runs) continue
+
+      return {
+        id: generateId(),
+        type: 'fillRegion',
+        width: maskWidth,
+        height: maskHeight,
+        runs: expandRuns(runs, maskWidth, maskHeight, FILL_OVERLAP_PADDING),
+        style: {
+          stroke,
+          strokeWidth: 0,
+          fill,
+          opacity: 1,
+        },
+      }
     }
   }
 
