@@ -3,12 +3,16 @@ import { generateId, rotatePoint } from './geometry'
 import { resolveFillStyle } from './canvasFill'
 
 const WALL_ALPHA_THRESHOLD = 8
-const WALL_PADDING = 1.5
-const MAX_SEED_SEARCH_RADIUS = 5
+const WALL_PADDING = 4
+const MASK_DILATION_PASSES = 2
+const MAX_SEED_SEARCH_RADIUS = 14
+const MAX_SEED_CANDIDATES = 96
 const MIN_REGION_PIXELS = 4
+const FILL_OVERLAP_PADDING = MASK_DILATION_PASSES + 1
 const renderedFillCache = new Map<string, HTMLCanvasElement>()
 
 type Seed = { x: number; y: number }
+type SeedCandidate = Seed & { distanceSq: number }
 
 function drawPathWalls(ctx: CanvasRenderingContext2D, path: GeoPath) {
   if (path.points.length < 2) return
@@ -117,18 +121,56 @@ function buildWallMask(objects: GeoObject[], width: number, height: number): Uin
   return wall
 }
 
-function findSeed(
+function dilateWallMask(
+  wall: Uint8Array,
+  width: number,
+  height: number,
+  passes: number,
+): Uint8Array {
+  let current = wall
+
+  for (let pass = 0; pass < passes; pass++) {
+    const next = current.slice()
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const index = y * width + x
+        if (current[index] === 0) continue
+
+        for (let dy = -1; dy <= 1; dy++) {
+          const ny = y + dy
+          if (ny < 0 || ny >= height) continue
+
+          for (let dx = -1; dx <= 1; dx++) {
+            const nx = x + dx
+            if (nx < 0 || nx >= width) continue
+            next[ny * width + nx] = 1
+          }
+        }
+      }
+    }
+
+    current = next
+  }
+
+  return current
+}
+
+function findSeedCandidates(
   wall: Uint8Array,
   width: number,
   height: number,
   point: Point,
-): Seed | null {
+): Seed[] {
   const sx = Math.floor(point.x)
   const sy = Math.floor(point.y)
-  if (sx < 0 || sx >= width || sy < 0 || sy >= height) return null
+  if (sx < 0 || sx >= width || sy < 0 || sy >= height) return []
 
   const startIndex = sy * width + sx
-  if (wall[startIndex] === 0) return { x: sx, y: sy }
+  if (wall[startIndex] === 0) return [{ x: sx, y: sy }]
+
+  const seen = new Set<number>()
+  const candidates: SeedCandidate[] = []
 
   for (let radius = 1; radius <= MAX_SEED_SEARCH_RADIUS; radius++) {
     for (let dy = -radius; dy <= radius; dy++) {
@@ -137,12 +179,19 @@ function findSeed(
         const x = sx + dx
         const y = sy + dy
         if (x < 0 || x >= width || y < 0 || y >= height) continue
-        if (wall[y * width + x] === 0) return { x, y }
+        const index = y * width + x
+        if (wall[index] !== 0 || seen.has(index)) continue
+
+        seen.add(index)
+        candidates.push({ x, y, distanceSq: dx * dx + dy * dy })
       }
     }
   }
 
-  return null
+  return candidates
+    .sort((a, b) => a.distanceSq - b.distanceSq)
+    .slice(0, MAX_SEED_CANDIDATES)
+    .map(({ x, y }) => ({ x, y }))
 }
 
 function isOpenPixel(
@@ -223,6 +272,55 @@ function floodFillRuns(
   return runs
 }
 
+function expandRuns(
+  runs: FillRun[],
+  width: number,
+  height: number,
+  padding: number,
+): FillRun[] {
+  const byRow = new Map<number, Array<[number, number]>>()
+
+  for (const [y, xStart, xEnd] of runs) {
+    for (let dy = -padding; dy <= padding; dy++) {
+      const row = y + dy
+      if (row < 0 || row >= height) continue
+
+      const start = Math.max(0, xStart - padding)
+      const end = Math.min(width, xEnd + padding)
+      if (start >= end) continue
+
+      const rowRuns = byRow.get(row)
+      if (rowRuns) {
+        rowRuns.push([start, end])
+      } else {
+        byRow.set(row, [[start, end]])
+      }
+    }
+  }
+
+  const expanded: FillRun[] = []
+  const rows = Array.from(byRow.keys()).sort((a, b) => a - b)
+  for (const row of rows) {
+    const rowRuns = byRow.get(row)!
+    rowRuns.sort((a, b) => a[0] - b[0])
+
+    let [mergedStart, mergedEnd] = rowRuns[0]
+    for (let i = 1; i < rowRuns.length; i++) {
+      const [start, end] = rowRuns[i]
+      if (start <= mergedEnd) {
+        mergedEnd = Math.max(mergedEnd, end)
+      } else {
+        expanded.push([row, mergedStart, mergedEnd])
+        mergedStart = start
+        mergedEnd = end
+      }
+    }
+    expanded.push([row, mergedStart, mergedEnd])
+  }
+
+  return expanded
+}
+
 export function createBucketFillRegion(
   objects: GeoObject[],
   point: Point,
@@ -233,26 +331,35 @@ export function createBucketFillRegion(
 ): GeoFillRegion | null {
   const maskWidth = Math.max(1, Math.round(width))
   const maskHeight = Math.max(1, Math.round(height))
-  const wall = buildWallMask(objects, maskWidth, maskHeight)
-  const seed = findSeed(wall, maskWidth, maskHeight, point)
-  if (!seed) return null
+  const wall = dilateWallMask(
+    buildWallMask(objects, maskWidth, maskHeight),
+    maskWidth,
+    maskHeight,
+    MASK_DILATION_PASSES,
+  )
+  const seeds = findSeedCandidates(wall, maskWidth, maskHeight, point)
+  if (seeds.length === 0) return null
 
-  const runs = floodFillRuns(wall, maskWidth, maskHeight, seed)
-  if (!runs) return null
+  for (const seed of seeds) {
+    const runs = floodFillRuns(wall, maskWidth, maskHeight, seed)
+    if (!runs) continue
 
-  return {
-    id: generateId(),
-    type: 'fillRegion',
-    width: maskWidth,
-    height: maskHeight,
-    runs,
-    style: {
-      stroke,
-      strokeWidth: 0,
-      fill,
-      opacity: 1,
-    },
+    return {
+      id: generateId(),
+      type: 'fillRegion',
+      width: maskWidth,
+      height: maskHeight,
+      runs: expandRuns(runs, maskWidth, maskHeight, FILL_OVERLAP_PADDING),
+      style: {
+        stroke,
+        strokeWidth: 0,
+        fill,
+        opacity: 1,
+      },
+    }
   }
+
+  return null
 }
 
 export function fillRegionContainsPoint(region: GeoFillRegion, point: Point): boolean {
