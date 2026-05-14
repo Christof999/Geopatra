@@ -1,6 +1,7 @@
 import { rotatePoint } from '../utils/geometry'
 import { isPatternFill, resolveFillStyle } from '../utils/canvasFill'
 import { getPathStepFill } from '../utils/pathFill'
+import { drawFillRegion } from '../utils/fillRegion'
 import type { GeoObject } from '../types'
 
 export const EXPORT_DPI = 300
@@ -55,6 +56,14 @@ export function renderObjectsToCanvas(
   ctx.lineJoin = 'round'
 
   for (const obj of objects) {
+    if (obj.type === 'fillRegion') {
+      drawFillRegion(ctx, obj, stencilMode)
+    }
+  }
+
+  for (const obj of objects) {
+    if (obj.type === 'fillRegion') continue
+
     const stroke = stencilMode ? '#000000' : obj.style.stroke
     const fill = stencilMode ? obj.style.fill : obj.style.fill
 

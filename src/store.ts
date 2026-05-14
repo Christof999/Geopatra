@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { DesignDoc, GeoObject, GeoPath, ToolType, Point } from './types'
 import { generateId, hitClosedPathStep, isPathFillable } from './utils/geometry'
 import { setPathStepFill } from './utils/pathFill'
+import { createBucketFillRegion, fillRegionContainsPoint } from './utils/fillRegion'
 
 const DEFAULT_STYLE = {
   stroke: '#1a1a1a',
@@ -108,8 +109,33 @@ export const useStore = create<StoreState>((set, get) => ({
   },
 
   applyBucketFill: (point) => {
-    const { objects, history, activeFill } = get()
+    const { objects, history, activeFill, activeStroke } = get()
     const { x: px, y: py } = point
+
+    if (activeFill === 'none') {
+      const next = objects.filter(
+        (obj) => obj.type !== 'fillRegion' || !fillRegionContainsPoint(obj, point),
+      )
+      if (next.length !== objects.length) {
+        set({ history: [...history, objects], objects: next })
+        return
+      }
+    } else if (typeof window !== 'undefined') {
+      const fillRegion = createBucketFillRegion(
+        objects,
+        point,
+        activeFill,
+        activeStroke,
+        window.innerWidth,
+        window.innerHeight,
+      )
+
+      if (fillRegion) {
+        set({ history: [...history, objects], objects: [...objects, fillRegion] })
+        return
+      }
+    }
+
     for (let i = objects.length - 1; i >= 0; i--) {
       const obj = objects[i]
       if (obj.type !== 'path') continue

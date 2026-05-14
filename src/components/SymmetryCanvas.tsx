@@ -2,6 +2,7 @@ import { useRef, useEffect, useCallback } from 'react'
 import { useStore } from '../store'
 import { rotatePoint, generateId, isStrokeClosed } from '../utils/geometry'
 import { resolveFillStyle } from '../utils/canvasFill'
+import { drawFillRegion } from '../utils/fillRegion'
 import type { GeoObject, PathStepFills, StrokePoint } from '../types'
 
 // ── Pure canvas drawing helpers (no React) ────────────────────────────────
@@ -306,6 +307,12 @@ export default function SymmetryCanvas() {
       ctx.fillRect(0, 0, w, h)
 
       drawGrid(ctx, w, h)
+
+      for (const obj of objects) {
+        if (obj.type === 'fillRegion') {
+          drawFillRegion(ctx, obj)
+        }
+      }
 
       for (const obj of objects) {
         if (obj.type === 'path') {
