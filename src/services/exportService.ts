@@ -1,5 +1,7 @@
 import { rotatePoint } from '../utils/geometry'
 import { isPatternFill, resolveFillStyle } from '../utils/canvasFill'
+import { getPathStepFill } from '../utils/pathFill'
+import { drawFillRegion } from '../utils/fillRegion'
 import type { GeoObject } from '../types'
 
 export const EXPORT_DPI = 300
@@ -54,6 +56,14 @@ export function renderObjectsToCanvas(
   ctx.lineJoin = 'round'
 
   for (const obj of objects) {
+    if (obj.type === 'fillRegion') {
+      drawFillRegion(ctx, obj, stencilMode)
+    }
+  }
+
+  for (const obj of objects) {
+    if (obj.type === 'fillRegion') continue
+
     const stroke = stencilMode ? '#000000' : obj.style.stroke
     const fill = stencilMode ? obj.style.fill : obj.style.fill
 
@@ -80,20 +90,20 @@ export function renderObjectsToCanvas(
       }
       ctx.stroke()
     } else if (obj.type === 'path') {
-      const pathFillRaw = obj.style.fill
-      const pathFillStencil =
-        obj.closed && pathFillRaw !== 'none'
-          ? isPatternFill(pathFillRaw)
-            ? pathFillRaw
-            : '#000000'
-          : 'none'
-      const pathFill = stencilMode ? pathFillStencil : pathFillRaw
       const pathStroke = stroke
       const pathStrokeWidth = obj.style.strokeWidth
       const fillDotColor = stencilMode ? '#000000' : pathStroke
 
       for (let s = 0; s < obj.steps; s++) {
         const alpha = (s / obj.steps) * Math.PI * 2
+        const pathFillRaw = getPathStepFill(obj, s)
+        const pathFillStencil =
+          obj.closed && pathFillRaw !== 'none'
+            ? isPatternFill(pathFillRaw)
+              ? pathFillRaw
+              : '#000000'
+            : 'none'
+        const pathFill = stencilMode ? pathFillStencil : pathFillRaw
 
         // Fill pass
         if (pathFill !== 'none' && obj.closed) {

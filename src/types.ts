@@ -38,6 +38,10 @@ export interface StrokePoint {
   pressure: number
 }
 
+export type PathStepFills = Record<number, string>
+
+export type FillRun = [y: number, xStart: number, xEnd: number]
+
 export interface GeoPath {
   id: string
   type: 'path'
@@ -46,10 +50,20 @@ export interface GeoPath {
   centerX: number
   centerY: number
   closed: boolean
+  stepFills?: PathStepFills
   style: ShapeStyle
 }
 
-export type GeoObject = GeoPoint | GeoLine | GeoCircle | GeoPath
+export interface GeoFillRegion {
+  id: string
+  type: 'fillRegion'
+  width: number
+  height: number
+  runs: FillRun[]
+  style: ShapeStyle
+}
+
+export type GeoObject = GeoPoint | GeoLine | GeoCircle | GeoPath | GeoFillRegion
 
 export interface ShapeStyle {
   stroke: string
