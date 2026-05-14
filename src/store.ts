@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { DesignDoc, GeoObject, GeoPath, ToolType, Point } from './types'
-import { generateId, pointInClosedPath } from './utils/geometry'
+import { generateId, isPathFillable, pointInClosedPath } from './utils/geometry'
 
 const DEFAULT_STYLE = {
   stroke: '#1a1a1a',
@@ -67,7 +67,7 @@ export const useStore = create<StoreState>((set, get) => ({
   symmetrySteps: 6,
   symmetryCenter: null,
   activeStroke: '#1a1a1a',
-  activeFill: 'none',
+  activeFill: 'rgba(0,0,0,0.20)',
   activeStrokeWidth: 1.5,
 
   setTool: (tool) =>
@@ -116,6 +116,7 @@ export const useStore = create<StoreState>((set, get) => ({
       const next = objects.slice()
       next[i] = {
         ...obj,
+        closed: obj.closed || isPathFillable(obj),
         style: { ...obj.style, fill: activeFill },
       }
       set({ history: [...history, objects], objects: next })

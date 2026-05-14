@@ -1,6 +1,6 @@
 import { useRef, useEffect, useCallback } from 'react'
 import { useStore } from '../store'
-import { rotatePoint, generateId } from '../utils/geometry'
+import { rotatePoint, generateId, isStrokeClosed } from '../utils/geometry'
 import { resolveFillStyle } from '../utils/canvasFill'
 import type { GeoObject, StrokePoint } from '../types'
 
@@ -57,6 +57,72 @@ function drawGuides(
   ctx.beginPath()
   ctx.arc(cx, cy, 2.5, 0, Math.PI * 2)
   ctx.fill()
+}
+
+function drawFillCursor(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  fill: string,
+  stroke: string,
+) {
+  const swatchX = x + 20
+  const swatchY = y + 18
+  const swatchRadius = 9
+
+  ctx.save()
+
+  ctx.strokeStyle = 'rgba(17, 24, 39, 0.75)'
+  ctx.lineWidth = 1.25
+  ctx.beginPath()
+  ctx.arc(x, y, 6, 0, Math.PI * 2)
+  ctx.moveTo(x - 10, y)
+  ctx.lineTo(x - 4, y)
+  ctx.moveTo(x + 4, y)
+  ctx.lineTo(x + 10, y)
+  ctx.moveTo(x, y - 10)
+  ctx.lineTo(x, y - 4)
+  ctx.moveTo(x, y + 4)
+  ctx.lineTo(x, y + 10)
+  ctx.stroke()
+
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.28)'
+  ctx.shadowBlur = 8
+  ctx.shadowOffsetY = 2
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.96)'
+  ctx.beginPath()
+  ctx.arc(swatchX, swatchY, swatchRadius + 4, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.shadowColor = 'transparent'
+
+  ctx.beginPath()
+  ctx.arc(swatchX, swatchY, swatchRadius, 0, Math.PI * 2)
+  ctx.clip()
+
+  const fs = resolveFillStyle(ctx, fill, stroke)
+  if (fs === 'none') {
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(swatchX - swatchRadius, swatchY - swatchRadius, swatchRadius * 2, swatchRadius * 2)
+    ctx.strokeStyle = '#6b7280'
+    ctx.lineWidth = 1.5
+    ctx.beginPath()
+    ctx.moveTo(swatchX - 6, swatchY + 6)
+    ctx.lineTo(swatchX + 6, swatchY - 6)
+    ctx.stroke()
+  } else {
+    ctx.fillStyle = fs
+    ctx.fillRect(swatchX - swatchRadius, swatchY - swatchRadius, swatchRadius * 2, swatchRadius * 2)
+  }
+
+  ctx.restore()
+
+  ctx.save()
+  ctx.strokeStyle = 'rgba(17, 24, 39, 0.8)'
+  ctx.lineWidth = 1.25
+  ctx.beginPath()
+  ctx.arc(swatchX, swatchY, swatchRadius + 4, 0, Math.PI * 2)
+  ctx.stroke()
+  ctx.restore()
 }
 
 function drawStroke(
@@ -146,6 +212,7 @@ export default function SymmetryCanvas() {
   const isDrawingRef = useRef(false)
   const activePointerIdRef = useRef<number | null>(null)
   const activePointerTypeRef = useRef<string | null>(null)
+  const fillPointerRef = useRef<{ x: number; y: number } | null>(null)
 
   const rs = useRef<RenderState>({
     objects: useStore.getState().objects,
@@ -181,6 +248,9 @@ export default function SymmetryCanvas() {
     if (selectedTool !== 'draw') {
       liveRef.current = []
       isDrawingRef.current = false
+    }
+    if (selectedTool !== 'fill') {
+      fillPointerRef.current = null
     }
   }, [selectedTool])
 
@@ -222,6 +292,7 @@ export default function SymmetryCanvas() {
         cy,
         selectedTool,
         activeStroke,
+        activeFill,
         activeStrokeWidth,
       } = rs.current
 
@@ -268,6 +339,16 @@ export default function SymmetryCanvas() {
         drawGuides(ctx, cx, cy, symmetrySteps, w, h)
       }
 
+      if (selectedTool === 'fill' && fillPointerRef.current) {
+        drawFillCursor(
+          ctx,
+          fillPointerRef.current.x,
+          fillPointerRef.current.y,
+          activeFill,
+          activeStroke,
+        )
+      }
+
       ctx.restore()
       rafId = requestAnimationFrame(render)
     }
@@ -281,6 +362,7 @@ export default function SymmetryCanvas() {
   const onPointerDown = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {
       if (rs.current.selectedTool === 'fill') {
+        fillPointerRef.current = { x: e.clientX, y: e.clientY }
         applyBucketFill({ x: e.clientX, y: e.clientY })
         return
       }
@@ -306,6 +388,11 @@ export default function SymmetryCanvas() {
   )
 
   const onPointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (rs.current.selectedTool === 'fill') {
+      fillPointerRef.current = { x: e.clientX, y: e.clientY }
+      return
+    }
+
     if (!isDrawingRef.current) return
     if (e.pointerId !== activePointerIdRef.current) return
 
@@ -313,6 +400,10 @@ export default function SymmetryCanvas() {
     for (const ev of evts) {
       liveRef.current.push({ x: ev.clientX, y: ev.clientY, pressure: ev.pressure || 0.5 })
     }
+  }, [])
+
+  const onPointerLeave = useCallback(() => {
+    fillPointerRef.current = null
   }, [])
 
   const finishStroke = useCallback(
@@ -330,9 +421,7 @@ export default function SymmetryCanvas() {
 
       const { cx, cy, symmetrySteps, activeStroke, activeStrokeWidth } = rs.current
 
-      // Detect closed path: first and last point within 24px
-      const dist = Math.hypot(pts[pts.length - 1].x - pts[0].x, pts[pts.length - 1].y - pts[0].y)
-      const closed = dist < 24
+      const closed = isStrokeClosed(pts, activeStrokeWidth)
 
       addPath({
         id: generateId(),
@@ -364,11 +453,12 @@ export default function SymmetryCanvas() {
           selectedTool === 'draw'
             ? 'crosshair'
             : selectedTool === 'fill'
-              ? 'cell'
+              ? 'none'
               : 'default',
       }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
+      onPointerLeave={onPointerLeave}
       onPointerUp={finishStroke}
       onPointerCancel={finishStroke}
     />
